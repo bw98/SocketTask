@@ -73,7 +73,6 @@ class Listener(threading.Thread):
             print('having a connection from {}'.format(clientIpAddr))
             reader = Reader(client=client)
             reader.start()
-            reader.join()
             string = reader.getStr()
             print(string)
             string = string[9:]
