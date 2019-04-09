@@ -49,7 +49,7 @@ class Listener(threading.Thread):
                                   0)  # AF_INET 表示用IPV4地址族，SOCK_STREAM 是说是要是用流式套接字 0 是指不指定协议类型，系统自动根据情况指定
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((ipAddr, port))
-        self.sock.listen(0)  # 如何增加连接数量？
+        self.sock.listen(1000)  # WIN和MAC需要设置最大连接数量
         self.ENCODING = 'utf-8'
         self.BUFFERSIZE = 1024
 
@@ -73,6 +73,7 @@ class Listener(threading.Thread):
             print('having a connection from {}'.format(clientIpAddr))
             reader = Reader(client=client)
             reader.start()
+            reader.join()  # 这么写多线程存在问题
             string = reader.getStr()
             print(string)
             string = string[9:]
@@ -99,6 +100,7 @@ class Listener(threading.Thread):
 
 if __name__ == '__main__':
     ipAddress = socket.gethostbyname(socket.gethostname()) # 默认将host作为ip地址
-    print("host:{}".format(ipAddress))
-    listener = Listener(ipAddr=ipAddress, port=12233)  # listener 类继承了 threading 类
+    port = 12233
+    print("host:{}, port:{}".format(ipAddress, port))
+    listener = Listener(ipAddr=ipAddress, port=port)  # listener 类继承了 threading 类
     listener.start()

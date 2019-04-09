@@ -48,4 +48,4 @@ def tcp_client_start(ipAddr, port):
 
 
 if __name__ == '__main__':
-    tcp_client_start(ipAddr='192.168.1.115', port=12233)  # 需要知道server的ip和监听端口
+    tcp_client_start(ipAddr='192.168.0.102', port=12233)  # 需要知道server的ip和监听端口
