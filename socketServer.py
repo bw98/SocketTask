@@ -1,4 +1,4 @@
-# coding:utf-8
+# coding=utf-8
 
 # 本程序用于服务器练习
 # 在 tcp 连接中，server 负责启动一个ip和端口，在这个端口监听，
@@ -15,33 +15,83 @@ import threading
 import re
 
 
+# 读取文件对象
+class Sentence:
+    sentence = []
+
+    def __init__(self):
+        self.my_sentence = []  # 需要读取多个文件对象时则实例化并使用 my_sentence
+
+    @classmethod
+    def getSentence(cls):
+        return cls.sentence
+
+    @classmethod
+    def setSentenceByFile(cls, file_name='English900.txt'):
+        # 读取英语900文本
+        with open(file_name, 'r') as f:
+            while True:
+                line = f.readline()
+                if not line:
+                    break
+                cls.sentence.append(line)
+
+    def getMySentence(self):
+        return self.my_sentence
+
+    def setMySentence(self):
+        return self.my_sentence
+
+
 class Reader(threading.Thread):
+
     def __init__(self, client):
         threading.Thread.__init__(self)
         self.client = client
         self.ENCODING = 'utf-8'
-        self.BUFFERSIZE = 1024
+        self.buffersize = 1024
         self.str = ""
 
     def getStr(self):
         return self.str
 
-    def setStr(self, str):
-        self.str = str
+    def setStr(self, string):
+        self.str = string
 
     def run(self):
+        print("现在运行的线程是：", self.getName())
         while True:
-            data = self.client.recv(self.BUFFERSIZE)
+            data = self.client.recv(self.buffersize)
+            print("【Reader】从客户端接受到的数据为:", data)
             if data:
                 str = bytes.decode(data, self.ENCODING)
-                self.setStr(str=str)
+                self.setStr(string=str)
             else:
                 break
-        print("close:", self.client.getpeername())
+        print("【Reader】 从 {} 接收到数据".format(self.client.getpeername()))
+        string = self.getStr()
+        string = string[9:]
+        if not re.match('[^0-9,]', string):
+            print("data format from client match successfully")
+            num_list = string.split(',')
+            send_data = ''
+            sentence = Sentence.getSentence()  # 得到含文件ENglish900所有句子的对象
+            for item in num_list:
+                if (int(item) - 1) < len(sentence):
+                    send_data = send_data + sentence[int(item) - 1]
+            byteswritten = 0
+            if byteswritten < len(send_data):
+                start_pos = byteswritten
+                end_pos = min(byteswritten + self.buffersize, len(send_data))
+                self.client.send(bytes(send_data[start_pos:end_pos], encoding=self.ENCODING))
+        else:
+            send_data = 'error in sent data format'
+            self.client.send(bytes(send_data, encoding=self.ENCODING))
 
 
 class Listener(threading.Thread):
-    def __init__(self, ipAddr, port):
+
+    def __init__(self, ipAddr='127.0.0.1', port=12345):
         threading.Thread.__init__(self)
         self.port = port
         self.ip = ipAddr
@@ -56,51 +106,20 @@ class Listener(threading.Thread):
     # 重写父类 threading.Thread 的 run 方法
     def run(self):
         print("TCP SERVER start...")
+        print("host:{}, port:{}".format(self.ip, self.port))
 
-        sentence = []
-        # 读取英语900文本
-        f = open('English900.txt', 'r')
-        while 1:
-            line = f.readline()
-            if not line:
-                break
-            sentence.append(line)
-        f.close()
+        # 接受客户端数据并响应
         while True:
-            # 接受客户端数据并响应
             print("waiting for connection")
-            client, clientIpAddr = self.sock.accept()
-            print('having a connection from {}'.format(clientIpAddr))
+            client, client_ip_addr = self.sock.accept()  # 接受客户端请求之前保持阻塞
+            print('having a connection from {}'.format(client_ip_addr))
             reader = Reader(client=client)
             reader.start()
-            reader.join()  # 这么写多线程存在问题
-            string = reader.getStr()
-            print(string)
-            string = string[9:]
-            print(string)
-            if not re.match('[^0-9,]', string):
-                print("data format from client match successfully")
-                numList = string.split(',')
-                data = ''
-                for item in numList:
-                    if (int(item)-1) < len(sentence):
-                        data = data + sentence[int(item)-1]
-                byteswritten = 0
-                if byteswritten < len(data):
-                    startpos = byteswritten
-                    endpos = min(byteswritten + self.BUFFERSIZE, len(data))
-                    client.send(bytes(data[startpos:endpos], encoding=self.ENCODING))
-            else:
-                data = 'error in sent data format'
-                client.send(bytes(data, encoding=self.ENCODING))
-
-            # print('finish, close current client')
-            # client.close()
 
 
 if __name__ == '__main__':
-    ipAddress = socket.gethostbyname(socket.gethostname()) # 默认将host作为ip地址
-    port = 12233
-    print("host:{}, port:{}".format(ipAddress, port))
-    listener = Listener(ipAddr=ipAddress, port=port)  # listener 类继承了 threading 类
+    server_addr = socket.gethostbyname(socket.gethostname())  # 将host作为服务器ip地址
+    server_port = 12233
+    Sentence.setSentenceByFile()  # 获取文件中的句子并初始化sentence类变量
+    listener = Listener()  # listener 类继承了 threading 类
     listener.start()

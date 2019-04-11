@@ -1,4 +1,4 @@
-# coding:utf-8
+# coding=utf-8
 
 # 客户端流程为：
 # 1. 创建接口
@@ -9,13 +9,18 @@
 # 发起连接的函数为socket.connect(ip,port)
 # ip与port为socket server端的ip和监听port。
 import socket
-import sys
-import time
+import os
+import fcntl
+from socketServer import Sentence
 
 BUFFERSIZE = 1024
 
 
-def tcp_client_start(ipAddr, port):
+def tcp_client_start(ipAddr='127.0.0.1', port=12345, data=''):
+    if data == '':
+        print('请输入要发送给服务器的信息，格式：sentence: 编号，编号')
+        return
+
     # server port and ip
     server_ip = ipAddr
     server_port = port
@@ -23,29 +28,46 @@ def tcp_client_start(ipAddr, port):
     try:
         tcp_client.connect((server_ip, server_port))
         print("connect server successfully")
-        data = "sentence:1,2,3"
         byteswritten = 0
         while byteswritten < len(data):
             startpos = byteswritten
             endpos = min(byteswritten + BUFFERSIZE, len(data))
             byteswritten += tcp_client.send(bytes(data[startpos:endpos], encoding="utf-8"))
-            sys.stdout.write("Wrote %d bytes\r" % byteswritten)
-            sys.stdout.flush()
-        tcp_client.shutdown(1)
+            print("Wrote %d bytes\r" % byteswritten)
+        tcp_client.shutdown(socket.SHUT_WR)  # 强制关闭客户端socket输出，解决短连接断开后发带空串socket的问题
         print("All data sent.")
-        while 1:
+        while True:
             buf = tcp_client.recv(BUFFERSIZE)
+            buf = bytes.decode(buf, encoding='utf-8')
+            print("服务器传回的数据为：{}".format(buf))
             if not len(buf):
                 break
-            print("服务器传回的数据为：{}".format(buf))
-            fileName = 'client(' + time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time())) + ').txt'
-            f = open(fileName, 'a')
-            f.write(bytes.decode(buf, encoding='utf-8'))
-            f.close()
+
+            # 文件操作，多进程写入文件需要加锁
+            fileName = 'client.txt'
+
+            if not os.path.exists(fileName):
+                with open(fileName, 'w') as f:
+                    f.write(buf)
+                    print('文件不存在，创建并写入文件成功')
+
+            else:
+                with open(fileName, 'a') as f:
+                    Sentence.setSentenceByFile(file_name=fileName)
+                    sentence = Sentence.getSentence()
+                    fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                    buf_to_list = buf.split(sep='\n')
+                    for item in buf_to_list:
+                        if (item + '\n') not in sentence:
+                            f.write(item)
+                    print('获取文件锁并写入成功')
 
     except Exception as e:
         print(e)
 
 
 if __name__ == '__main__':
-    tcp_client_start(ipAddr='192.168.0.102', port=12233)  # 需要知道server的ip和监听端口
+    server_ipAddr = '192.168.1.129'
+    server_port = 12233
+    send_data = "sentence:1,2,3"
+    tcp_client_start(data=send_data)  # 需要知道server的ip和监听端口
