@@ -39,28 +39,27 @@ def tcp_client_start(ipAddr='127.0.0.1', port=12345, data=''):
         while True:
             buf = tcp_client.recv(BUFFERSIZE)
             buf = bytes.decode(buf, encoding='utf-8')
-            print("服务器传回的数据为：{}".format(buf))
             if not len(buf):
                 break
-
+            print("服务器传回的数据为：{}".format(buf))  # 断开连接时服务器会传空串，如果写在if前则输出两次
             # 文件操作，多进程写入文件需要加锁
             fileName = 'client.txt'
-
             if not os.path.exists(fileName):
                 with open(fileName, 'w') as f:
                     f.write(buf)
                     print('文件不存在，创建并写入文件成功')
-
             else:
                 with open(fileName, 'a') as f:
                     Sentence.setSentenceByFile(file_name=fileName)
                     sentence = Sentence.getSentence()
                     fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                    print('成功获取文件锁')
                     buf_to_list = buf.split(sep='\n')
                     for item in buf_to_list:
                         if (item + '\n') not in sentence:
                             f.write(item)
-                    print('获取文件锁并写入成功')
+                        else:
+                            print('句子' + item + ' 重复，写入失败')
 
     except Exception as e:
         print(e)
@@ -69,5 +68,5 @@ def tcp_client_start(ipAddr='127.0.0.1', port=12345, data=''):
 if __name__ == '__main__':
     server_ipAddr = '192.168.1.129'
     server_port = 12233
-    send_data = "sentence:1,2,3"
+    send_data = "sentence:5,7,9"
     tcp_client_start(data=send_data)  # 需要知道server的ip和监听端口
